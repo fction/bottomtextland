@@ -94,6 +94,117 @@ const showreelItems = [
   ["Static 06", "#10151d", "#f2f1ef", "#b7ff4d"],
 ];
 
+const TORNADO_PRESETS = Object.freeze({
+  long: {
+    // LOCKED DESKTOP BASELINE. Tune mobile in long.mobile, not here.
+    desktop: {
+      scaleBaseWidth: 1380,
+      scaleBaseHeight: 790,
+      scaleMin: 1,
+      scaleMax: 1.18,
+      topRadius: 7.76,
+      bottomRadius: 4.72,
+      topDepth: 4.42,
+      bottomDepth: 3.28,
+      top: 4.08,
+      bottom: -10.05,
+      cardScale: 1.14,
+      cameraZ: 18.2,
+      turns: 5.65,
+      backScale: 0.5,
+      frontScale: 0.84,
+      topCardScale: 1.5,
+      bottomCardScale: 0.68,
+      entryLift: 2.55,
+      entryProgress: 0.105,
+    },
+    mobile: {
+      scaleBaseWidth: 1600,
+      scaleBaseHeight: 900,
+      scaleMin: 0.68,
+      scaleMax: 1.1,
+      topRadius: 2.88,
+      bottomRadius: 2.1,
+      topDepth: 2.42,
+      bottomDepth: 1.72,
+      top: 7.45,
+      bottom: -7.35,
+      cardScale: 0.86,
+      cameraZ: 18.9,
+      turns: 5.65,
+      backScale: 0.5,
+      frontScale: 0.84,
+      topCardScale: 1.35,
+      bottomCardScale: 0.74,
+      entryLift: 1.45,
+      entryProgress: 0.12,
+    },
+  },
+  compact: {
+    desktop: {
+      scaleBaseWidth: 1600,
+      scaleBaseHeight: 900,
+      scaleMin: 0.68,
+      scaleMax: 1.1,
+      topRadius: 6.2,
+      bottomRadius: 1.55,
+      topDepth: 4.25,
+      bottomDepth: 1.25,
+      top: 2.55,
+      bottom: -3.65,
+      cardScale: 1.24,
+      cameraZ: 13.4,
+      turns: 4.4,
+      backScale: 0.48,
+      frontScale: 1.05,
+    },
+    mobile: {
+      scaleBaseWidth: 1600,
+      scaleBaseHeight: 900,
+      scaleMin: 0.68,
+      scaleMax: 1.1,
+      topRadius: 2.85,
+      bottomRadius: 1,
+      topDepth: 2.35,
+      bottomDepth: 0.92,
+      top: 2.92,
+      bottom: -3.65,
+      cardScale: 1.04,
+      cameraZ: 12.8,
+      turns: 4.4,
+      backScale: 0.48,
+      frontScale: 1.05,
+    },
+  },
+});
+
+function getTornadoScale(width, height, preset) {
+  return THREE.MathUtils.clamp(
+    Math.min(width / preset.scaleBaseWidth, height / preset.scaleBaseHeight),
+    preset.scaleMin,
+    preset.scaleMax,
+  );
+}
+
+function applyTornadoPreset(layout, preset, scale) {
+  layout.topRadius = preset.topRadius * scale;
+  layout.bottomRadius = preset.bottomRadius * scale;
+  layout.topDepth = preset.topDepth * scale;
+  layout.bottomDepth = preset.bottomDepth * scale;
+  layout.top = preset.top * scale;
+  layout.bottom = preset.bottom * scale;
+  layout.cardScale = preset.cardScale * scale;
+  layout.cameraZ = preset.cameraZ / scale;
+
+  if ("topCardScale" in preset) layout.topCardScale = preset.topCardScale;
+  if ("bottomCardScale" in preset) layout.bottomCardScale = preset.bottomCardScale;
+  if ("entryLift" in preset) layout.entryLift = preset.entryLift * scale;
+  if ("entryProgress" in preset) layout.entryProgress = preset.entryProgress;
+  if ("turns" in preset) layout.turns = preset.turns;
+  if ("backScale" in preset) layout.backScale = preset.backScale;
+  if ("frontScale" in preset) layout.frontScale = preset.frontScale;
+}
+
 function makeTexture([label, c1, c2, c3]) {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
@@ -744,47 +855,10 @@ function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
       const width = mount.clientWidth || 1;
       const height = mount.clientHeight || 1;
       const aspect = width / height;
-      const viewportScale = THREE.MathUtils.clamp(Math.min(width / 1600, height / 900), 0.68, 1.1);
       const portrait = aspect < 0.9;
-      if (long) {
-        if (portrait) {
-          layout.topRadius = 2.88 * viewportScale;
-          layout.bottomRadius = 2.1 * viewportScale;
-          layout.topDepth = 2.42 * viewportScale;
-          layout.bottomDepth = 1.72 * viewportScale;
-          layout.top = 7.45 * viewportScale;
-          layout.bottom = -7.35 * viewportScale;
-          layout.cardScale = 0.86 * viewportScale;
-          layout.cameraZ = 18.9 / viewportScale;
-          layout.topCardScale = 1.35;
-          layout.bottomCardScale = 0.74;
-          layout.entryLift = 1.45 * viewportScale;
-          layout.entryProgress = 0.12;
-        } else {
-          const desktopScale = THREE.MathUtils.clamp(Math.min(width / 1380, height / 790), 1, 1.18);
-          layout.topRadius = 7.76 * desktopScale;
-          layout.bottomRadius = 4.72 * desktopScale;
-          layout.topDepth = 4.42 * desktopScale;
-          layout.bottomDepth = 3.28 * desktopScale;
-          layout.top = 4.08 * desktopScale;
-          layout.bottom = -10.05 * desktopScale;
-          layout.cardScale = 1.14 * desktopScale;
-          layout.cameraZ = 18.2 / desktopScale;
-          layout.topCardScale = 1.5;
-          layout.bottomCardScale = 0.68;
-          layout.entryLift = 2.55 * desktopScale;
-          layout.entryProgress = 0.105;
-        }
-      } else {
-        layout.topRadius = (portrait ? 2.85 : 6.2) * viewportScale;
-        layout.bottomRadius = (portrait ? 1 : 1.55) * viewportScale;
-        layout.topDepth = (portrait ? 2.35 : 4.25) * viewportScale;
-        layout.bottomDepth = (portrait ? 0.92 : 1.25) * viewportScale;
-        layout.top = (portrait ? 2.92 : 2.55) * viewportScale;
-        layout.bottom = (portrait ? -3.65 : -3.65) * viewportScale;
-        layout.cardScale = (portrait ? 1.04 : 1.24) * viewportScale;
-        layout.cameraZ = (portrait ? 12.8 : 13.4) / viewportScale;
-      }
+      const scenePreset = TORNADO_PRESETS[long ? "long" : "compact"][portrait ? "mobile" : "desktop"];
+      const sceneScale = getTornadoScale(width, height, scenePreset);
+      applyTornadoPreset(layout, scenePreset, sceneScale);
       renderer.setSize(width, height, false);
       camera.aspect = aspect;
       camera.position.z = layout.cameraZ;
