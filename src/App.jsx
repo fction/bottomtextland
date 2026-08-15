@@ -123,21 +123,23 @@ const TORNADO_PRESETS = Object.freeze({
       scaleBaseHeight: 900,
       scaleMin: 0.68,
       scaleMax: 1.1,
-      topRadius: 5.35,
-      bottomRadius: 4.55,
-      topDepth: 3.65,
-      bottomDepth: 3.05,
-      top: 9.85,
-      bottom: -10.45,
-      cardScale: 1.08,
-      cameraZ: 14.8,
-      turns: 5.65,
+      topRadius: 6.45,
+      bottomRadius: 5.88,
+      topDepth: 4.32,
+      bottomDepth: 3.82,
+      top: 13.2,
+      bottom: -13.55,
+      cardScale: 1.14,
+      cameraZ: 13.9,
+      turns: 6.85,
       backScale: 0.5,
       frontScale: 0.84,
-      topCardScale: 1.44,
-      bottomCardScale: 0.82,
-      entryLift: 3.35,
-      entryProgress: 0.16,
+      topCardScale: 1.38,
+      bottomCardScale: 0.84,
+      entryLift: 5.65,
+      entryProgress: 0.18,
+      mobileSpine: true,
+      guideOpacity: 0.74,
     },
   },
   compact: {
@@ -203,6 +205,8 @@ function applyTornadoPreset(layout, preset, scale) {
   if ("turns" in preset) layout.turns = preset.turns;
   if ("backScale" in preset) layout.backScale = preset.backScale;
   if ("frontScale" in preset) layout.frontScale = preset.frontScale;
+  layout.mobileSpine = Boolean(preset.mobileSpine);
+  layout.guideOpacity = preset.guideOpacity ?? 0;
 }
 
 function makeTexture([label, c1, c2, c3]) {
@@ -714,6 +718,28 @@ function getTornadoPose(index, total, offset = 0, layout = {}) {
   };
 }
 
+function getTornadoGuidePoint(progress, layout = {}, phase = 0) {
+  const t = 0.35 + progress * Math.PI * (layout.turns ?? 4.4) + phase;
+  const radius = THREE.MathUtils.lerp(layout.topRadius ?? 6.4, layout.bottomRadius ?? 2.1, progress);
+  const depth = THREE.MathUtils.lerp(layout.topDepth ?? 4.4, layout.bottomDepth ?? 1.7, progress);
+  const top = (layout.top ?? 3.2) + (layout.entryLift ?? 0) * 0.45;
+  const bottom = (layout.bottom ?? -3.35) - (layout.entryLift ?? 0) * 0.22;
+  return new THREE.Vector3(
+    Math.sin(t) * radius,
+    THREE.MathUtils.lerp(top, bottom, progress),
+    Math.cos(t) * depth,
+  );
+}
+
+function makeTornadoGuideGeometry(layout, phase = 0, tubeRadius = 0.018) {
+  const points = [];
+  for (let i = 0; i <= 260; i += 1) {
+    points.push(getTornadoGuidePoint(i / 260, layout, phase));
+  }
+  const curve = new THREE.CatmullRomCurve3(points);
+  return new THREE.TubeGeometry(curve, 260, tubeRadius, 8, false);
+}
+
 function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
   const mountRef = useRef(null);
 
@@ -750,6 +776,67 @@ function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
     const root = new THREE.Group();
     root.rotation.x = -0.04;
     scene.add(root);
+
+    const mobileGuide = long ? new THREE.Group() : null;
+    const guideCoreMaterial = long ? new THREE.MeshBasicMaterial({
+      color: 0xb8ff88,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.AdditiveBlending,
+    }) : null;
+    const guideGlowMaterial = long ? new THREE.MeshBasicMaterial({
+      color: 0x79ff8b,
+      transparent: true,
+      opacity: 0.12,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.AdditiveBlending,
+    }) : null;
+    const axisCoreMaterial = long ? new THREE.MeshBasicMaterial({
+      color: 0x9dffc4,
+      transparent: true,
+      opacity: 0.34,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.AdditiveBlending,
+    }) : null;
+    const axisGlowMaterial = long ? new THREE.MeshBasicMaterial({
+      color: 0x64ff97,
+      transparent: true,
+      opacity: 0.1,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.AdditiveBlending,
+    }) : null;
+    const guideCore = long ? new THREE.Mesh(makeTornadoGuideGeometry(layout, 0, 0.012), guideCoreMaterial) : null;
+    const guideGlow = long ? new THREE.Mesh(makeTornadoGuideGeometry(layout, 0, 0.052), guideGlowMaterial) : null;
+    const axisCoreGeometry = long ? new THREE.CylinderGeometry(0.014, 0.014, 1, 14, 1, true) : null;
+    const axisGlowGeometry = long ? new THREE.CylinderGeometry(0.075, 0.075, 1, 18, 1, true) : null;
+    const axisCore = long ? new THREE.Mesh(axisCoreGeometry, axisCoreMaterial) : null;
+    const axisGlow = long ? new THREE.Mesh(axisGlowGeometry, axisGlowMaterial) : null;
+    if (mobileGuide) {
+      mobileGuide.visible = false;
+      mobileGuide.renderOrder = -6;
+      if (guideGlow) {
+        guideGlow.renderOrder = -8;
+        mobileGuide.add(guideGlow);
+      }
+      if (guideCore) {
+        guideCore.renderOrder = -7;
+        mobileGuide.add(guideCore);
+      }
+      if (axisGlow) {
+        axisGlow.renderOrder = -10;
+        mobileGuide.add(axisGlow);
+      }
+      if (axisCore) {
+        axisCore.renderOrder = -9;
+        mobileGuide.add(axisCore);
+      }
+      root.add(mobileGuide);
+    }
 
     const atmosphere = new THREE.Group();
     scene.add(atmosphere);
@@ -851,6 +938,34 @@ function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
       root.add(brandGlowMesh);
     }
 
+    const updateMobileGuide = () => {
+      if (!mobileGuide) return;
+      mobileGuide.visible = Boolean(layout.mobileSpine);
+      if (!layout.mobileSpine) return;
+
+      if (guideCore) {
+        guideCore.geometry.dispose();
+        guideCore.geometry = makeTornadoGuideGeometry(layout, 0, 0.012);
+      }
+      if (guideGlow) {
+        guideGlow.geometry.dispose();
+        guideGlow.geometry = makeTornadoGuideGeometry(layout, 0, 0.052);
+      }
+
+      const topPoint = getTornadoGuidePoint(0, layout, 0);
+      const bottomPoint = getTornadoGuidePoint(1, layout, 0);
+      const axisHeight = Math.abs(topPoint.y - bottomPoint.y);
+      const axisCenter = (topPoint.y + bottomPoint.y) * 0.5;
+      if (axisCore) {
+        axisCore.position.set(0, axisCenter, -0.02);
+        axisCore.scale.set(1, axisHeight, 1);
+      }
+      if (axisGlow) {
+        axisGlow.position.set(0, axisCenter, -0.04);
+        axisGlow.scale.set(1, axisHeight, 1);
+      }
+    };
+
     const resize = () => {
       const width = mount.clientWidth || 1;
       const height = mount.clientHeight || 1;
@@ -863,6 +978,17 @@ function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
       camera.aspect = aspect;
       camera.position.z = layout.cameraZ;
       camera.updateProjectionMatrix();
+      updateMobileGuide();
+      if (brandMesh) {
+        const mobileBrand = Boolean(layout.mobileSpine);
+        brandBasePosition.set(mobileBrand ? -0.08 : -0.1, mobileBrand ? -2.34 : -2.55, mobileBrand ? 0.38 : 0.62);
+        brandMesh.position.copy(brandBasePosition);
+        brandMesh.scale.setScalar(mobileBrand ? 1.08 : 1);
+        if (brandGlowMesh) {
+          brandGlowMesh.position.set(brandBasePosition.x, brandBasePosition.y - 0.02, brandBasePosition.z - 0.08);
+          brandGlowMesh.scale.set(mobileBrand ? 1.14 : 1.055, mobileBrand ? 1.2 : 1.12, 1);
+        }
+      }
     };
     resize();
     window.addEventListener("resize", resize);
@@ -881,6 +1007,13 @@ function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
         dust.position.y = Math.sin(time * 0.08) * 0.12;
       }
       root.rotation.y = Math.sin(time * 0.12) * 0.025;
+      if (mobileGuide?.visible) {
+        const guideOpacity = (layout.guideOpacity ?? 0.68) * (0.88 + Math.sin(time * 0.52) * 0.12);
+        if (guideCoreMaterial) guideCoreMaterial.opacity = guideOpacity * 0.58;
+        if (guideGlowMaterial) guideGlowMaterial.opacity = guideOpacity * 0.16;
+        if (axisCoreMaterial) axisCoreMaterial.opacity = guideOpacity * 0.42;
+        if (axisGlowMaterial) axisGlowMaterial.opacity = guideOpacity * 0.15;
+      }
       meshes.forEach((mesh, index) => {
         const pose = getTornadoPose(index, visibleSlots, offset, layout);
         mesh.position.set(pose.x, pose.y, pose.z);
@@ -921,6 +1054,14 @@ function HeroTornadoScene({ className = "hero-tornado-canvas", long = false }) {
       beamGeometry?.dispose();
       dustMaterial?.dispose();
       dustGeometry?.dispose();
+      guideCore?.geometry.dispose();
+      guideGlow?.geometry.dispose();
+      guideCoreMaterial?.dispose();
+      guideGlowMaterial?.dispose();
+      axisCoreGeometry?.dispose();
+      axisGlowGeometry?.dispose();
+      axisCoreMaterial?.dispose();
+      axisGlowMaterial?.dispose();
       brandTexture?.dispose();
       brandMaterial?.dispose();
       brandGlowMaterial?.dispose();
